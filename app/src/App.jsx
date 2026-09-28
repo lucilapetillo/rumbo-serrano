@@ -8,6 +8,8 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { RutaProtegida } from './components/RutaProtegida';
 import { Actividades } from './pages/Actividades';
 import { ActividadDetalle } from './pages/ActividadDetalle.jsx';
+import { Carrito } from './pages/Carrito';
+import Reservas from './pages/Reservas'; 
 
 export default function App() {
     return (
@@ -22,6 +24,8 @@ export default function App() {
                 <Route path="/registro" element={<Registro />} />
                 <Route path="/actividades" element={<Actividades />} />
                 <Route path="/actividades/:id" element={<ActividadDetalle />} />
+                <Route path="/carrito" element={<Carrito />} />
+                <Route path="/Reservas" element={<Reservas />} />
 
                 {/* Permitimos el ingreso tanto a 'admin' como a 'operador' */}
                 <Route

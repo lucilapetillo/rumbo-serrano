@@ -18,5 +18,13 @@ export const ItemCarrito = sequelize.define('ItemCarrito', {
   cantidad: {
     type: DataTypes.INTEGER,
     defaultValue: 1
+  },
+  fecha_reserva: {
+    type: DataTypes.DATEONLY, 
+    allowNull: true
+  },
+  turno: {
+    type: DataTypes.STRING, 
+    allowNull: true
   }
 }, { tableName: 'items_carrito' });

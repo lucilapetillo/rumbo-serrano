@@ -1,6 +1,6 @@
     import { Actividad } from '../models/Actividad.js';
 
-    // OBTENER TODAS LAS ACTIVIDADES
+    
     export const obtenerActividades = async (req, res) => {
     try {
         const actividades = await Actividad.findAll();
@@ -10,7 +10,7 @@
     }
     };
 
-    // CREAR ACTIVIDAD
+    
     export const crearActividad = async (req, res) => {
     try {
         const { 
@@ -50,7 +50,7 @@
     }
     };
 
-    // ACTUALIZAR ACTIVIDAD
+   
     export const actualizarActividad = async (req, res) => {
     try {
         const { id } = req.params;
@@ -97,7 +97,7 @@
     }
     };
 
-    // ELIMINAR ACTIVIDAD
+    
     export const eliminarActividad = async (req, res) => {
     try {
         const { id } = req.params;

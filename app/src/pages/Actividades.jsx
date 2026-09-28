@@ -40,8 +40,8 @@ export const Actividades = () => {
     const actividadesFiltradas = actividades.filter((act) => {
         const coincideCategoria = !categoriaSeleccionada || String(act.categoria_id) === String(categoriaSeleccionada);
         const coincideBusqueda = act.titulo?.toLowerCase().includes(busqueda.toLowerCase()) ||
-                                 act.descripcion?.toLowerCase().includes(busqueda.toLowerCase()) ||
-                                 act.ubicacion?.toLowerCase().includes(busqueda.toLowerCase());
+        act.descripcion?.toLowerCase().includes(busqueda.toLowerCase()) ||
+        act.ubicacion?.toLowerCase().includes(busqueda.toLowerCase());
         return coincideCategoria && coincideBusqueda;
     });
 

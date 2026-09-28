@@ -9,8 +9,16 @@ export const ActividadDetalle = () => {
     const [actividad, setActividad] = useState(null);
     const [loading, setLoading] = useState(true);
     
-    // Estado para la fecha/salida seleccionada
-    const [fechaSeleccionada, setFechaSeleccionada] = useState(null);
+    // Estados para los parámetros de la reserva
+    const [fechaSeleccionada, setFechaSeleccionada] = useState('');
+    const [turnoSeleccionado, setTurnoSeleccionado] = useState('Mañana (09:00 hs)');
+    
+    // Contadores para adultos y menores
+    const [cantidadAdultos, setCantidadAdultos] = useState(1);
+    const [cantidadMenores, setCantidadMenores] = useState(0);
+
+    const [agregando, setAgregando] = useState(false);
+    const [mensaje, setMensaje] = useState({ tipo: '', texto: '' });
 
     useEffect(() => {
         axios.get(`http://localhost:3000/api/actividades/${id}`)
@@ -18,10 +26,12 @@ export const ActividadDetalle = () => {
                 const data = Array.isArray(res.data) ? res.data[0] : res.data;
                 setActividad(data);
 
-                // Si la actividad trae un arreglo de fechas/salidas, preseleccionamos la primera
                 const salidas = data.fechas || data.salidas || data.turnos || [];
                 if (salidas.length > 0) {
-                    setFechaSeleccionada(salidas[0]);
+                    const primeraFecha = salidas[0].fecha || salidas[0];
+                    setFechaSeleccionada(primeraFecha);
+                } else if (data.fecha_inicio) {
+                    setFechaSeleccionada(data.fecha_inicio.split('T')[0]);
                 }
                 setLoading(false);
             })
@@ -46,21 +56,53 @@ export const ActividadDetalle = () => {
         );
     }
 
-    // Lista de fechas/salidas si existen en la respuesta del servidor
-    const listaFechas = actividad.fechas || actividad.salidas || actividad.turnos || [];
-
-    // Calculamos cupo disponible según si hay fecha seleccionada o si viene directo en la actividad
-    const cupoDisponible = fechaSeleccionada 
-        ? (fechaSeleccionada.cupo_disponible ?? fechaSeleccionada.cupo ?? 0)
-        : (actividad.cupo_disponible ?? actividad.cupo ?? 0);
-
+    const listaFechas = actividad.fechas || actividad.salidas || [];
+    const cupoDisponible = actividad.cupo_disponible ?? actividad.cupo ?? 10;
+    const totalPersonas = cantidadAdultos + cantidadMenores;
     const sinCupos = cupoDisponible <= 0;
 
-    const handleReservar = () => {
-        if (sinCupos) return;
-        // Acá redirigís a tu checkout/reserva pasando la fecha seleccionada
-        console.log("Reservando actividad:", actividad.id, "Fecha:", fechaSeleccionada);
-        // navigate(`/reservar/${actividad.id}`, { state: { fecha: fechaSeleccionada } });
+    const handleAgregarAlCarrito = async () => {
+        if (!fechaSeleccionada) {
+            setMensaje({ tipo: 'danger', texto: 'Por favor seleccioná una fecha para la reserva.' });
+            return;
+        }
+
+        const token = localStorage.getItem('token');
+        if (!token) {
+            setMensaje({ tipo: 'warning', texto: 'Debés iniciar sesión para reservar una experiencia.' });
+            setTimeout(() => navigate('/login'), 2000);
+            return;
+        }
+
+        setAgregando(true);
+        setMensaje({ tipo: '', texto: '' });
+
+        try {
+            await axios.post(
+                'http://localhost:3000/api/carrito/items',
+                {
+                    actividad_id: actividad.id,
+                    cantidad: totalPersonas, // Suma total por compatibilidad
+                    cantidad_adultos: cantidadAdultos,
+                    cantidad_menores: cantidadMenores,
+                    fecha_reserva: fechaSeleccionada,
+                    turno: turnoSeleccionado
+                },
+                {
+                    headers: { Authorization: `Bearer ${token}` }
+                }
+            );
+
+            setMensaje({ tipo: 'success', texto: '¡Actividad agregada al carrito con éxito!' });
+            setAgregando(false);
+        } catch (error) {
+            console.error('Error al agregar al carrito:', error);
+            setMensaje({ 
+                tipo: 'danger', 
+                texto: error.response?.data?.mensaje || error.response?.data?.error || 'Error al agregar al carrito.' 
+            });
+            setAgregando(false);
+        }
     };
 
     return (
@@ -85,70 +127,125 @@ export const ActividadDetalle = () => {
                     />
                 </div>
 
-                {/* Detalles y Formulario de Fecha */}
+                {/* Detalles y Formulario de Reserva */}
                 <div className="col-lg-6">
                     <h1 className="fw-bold text-dark mb-1">{actividad.titulo}</h1>
                     <p className="text-muted fw-bold mb-3">📍 {actividad.ubicacion || 'Ubicación a coordinar'}</p>
 
-                    <h2 className="text-success fw-bold fs-2 mb-3">
-                        ${Number(actividad.precio).toLocaleString('es-AR')}
+                    <h2 className="text-dark fw-bold fs-2 mb-3">
+                        ${Number(actividad.precio).toLocaleString('es-AR')} <span className="fs-6 text-muted font-normal">/ por persona</span>
                     </h2>
 
                     <p className="text-secondary mb-4" style={{ lineHeight: '1.6' }}>
-                        {actividad.descripcion || 'Recorrido guiado por el lago.'}
+                        {actividad.descripcion || 'Recorrido guiado por el lago y las sierras.'}
                     </p>
 
-                    {/* SELECTOR DE FECHAS (si la API devuelve varias fechas) */}
-                    {listaFechas.length > 0 ? (
-                        <div className="mb-4">
-                            <label className="form-label fw-bold text-dark">Seleccioná la fecha de salida:</label>
+                    {/* SELECTOR DE FECHAS */}
+                    <div className="mb-3">
+                        <label className="form-label fw-bold text-dark">Fecha de la excursión:</label>
+                        {listaFechas.length > 0 ? (
                             <select 
-                                className="form-select form-select-lg rounded-3 shadow-sm border-1"
-                                value={fechaSeleccionada ? (fechaSeleccionada.id || fechaSeleccionada.fecha) : ''}
-                                onChange={(e) => {
-                                    const seleccion = listaFechas.find(f => (f.id || f.fecha) == e.target.value);
-                                    setFechaSeleccionada(seleccion);
-                                }}
+                                className="form-select rounded-3 shadow-sm"
+                                value={fechaSeleccionada}
+                                onChange={(e) => setFechaSeleccionada(e.target.value)}
                             >
                                 {listaFechas.map((f, idx) => (
-                                    <option key={f.id || idx} value={f.id || f.fecha}>
-                                        {f.fecha ? new Date(f.fecha).toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : f.nombre}
+                                    <option key={idx} value={f.fecha || f}>
+                                        {f.fecha ? new Date(f.fecha).toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' }) : f}
                                     </option>
                                 ))}
                             </select>
-                        </div>
-                    ) : (
-                        /* Si no hay array de fechas, muestra la fecha global de la actividad si existe */
-                        actividad.fecha_inicio && (
-                            <div className="p-3 bg-light rounded-3 mb-4 border">
-                                <span className="fw-bold d-block text-dark">Fecha programada:</span>
-                                <span className="text-muted">
-                                    {new Date(actividad.fecha_inicio).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}
-                                </span>
-                            </div>
-                        )
-                    )}
-
-                    {/* INDICADOR DE CUPOS */}
-                    <div className="d-flex align-items-center mb-4">
-                        <span className={`badge px-3 py-2 rounded-pill fs-6 ${sinCupos ? 'bg-danger' : 'bg-dark'}`}>
-                            {sinCupos ? 'AGOTADO' : `Cupos disponibles: ${cupoDisponible}`}
-                        </span>
+                        ) : (
+                            <input 
+                                type="date"
+                                className="form-control rounded-3 shadow-sm"
+                                min={new Date().toISOString().split('T')[0]}
+                                value={fechaSeleccionada}
+                                onChange={(e) => setFechaSeleccionada(e.target.value)}
+                            />
+                        )}
                     </div>
 
-                    {/* BOTÓN RESERVAR */}
+                    {/* SELECTOR DE TURNO */}
+                    <div className="mb-3">
+                        <label className="form-label fw-bold text-dark">Turno / Horario:</label>
+                        <select 
+                            className="form-select rounded-3 shadow-sm"
+                            value={turnoSeleccionado}
+                            onChange={(e) => setTurnoSeleccionado(e.target.value)}
+                        >
+                            <option value="Mañana (09:00 hs)">Mañana (09:00 hs)</option>
+                            <option value="Tarde (14:00 hs)">Tarde (14:00 hs)</option>
+                            <option value="Atardecer (17:30 hs)">Atardecer (17:30 hs)</option>
+                        </select>
+                    </div>
+
+                    {/* CANTIDAD DE ADULTOS Y MENORES */}
+                    <div className="row g-3 mb-4">
+                        {/* ADULTOS */}
+                        <div className="col-6">
+                            <label className="form-label fw-bold text-dark">Adultos:</label>
+                            <div className="d-flex align-items-center gap-2">
+                                <button 
+                                    type="button" 
+                                    className="btn btn-outline-dark rounded-circle fw-bold"
+                                    style={{ width: '38px', height: '38px' }}
+                                    onClick={() => setCantidadAdultos(Math.max(1, cantidadAdultos - 1))}
+                                >
+                                    -
+                                </button>
+                                <span className="fw-bold fs-5 px-2">{cantidadAdultos}</span>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-outline-dark rounded-circle fw-bold"
+                                    style={{ width: '38px', height: '38px' }}
+                                    onClick={() => setCantidadAdultos(cantidadAdultos + 1)}
+                                >
+                                    +
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* MENORES */}
+                        <div className="col-6">
+                            <label className="form-label fw-bold text-dark">Menores:</label>
+                            <div className="d-flex align-items-center gap-2">
+                                <button 
+                                    type="button" 
+                                    className="btn btn-outline-dark rounded-circle fw-bold"
+                                    style={{ width: '38px', height: '38px' }}
+                                    onClick={() => setCantidadMenores(Math.max(0, cantidadMenores - 1))}
+                                >
+                                    -
+                                </button>
+                                <span className="fw-bold fs-5 px-2">{cantidadMenores}</span>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-outline-dark rounded-circle fw-bold"
+                                    style={{ width: '38px', height: '38px' }}
+                                    onClick={() => setCantidadMenores(cantidadMenores + 1)}
+                                >
+                                    +
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* MENSAJES DE ESTADO */}
+                    {mensaje.texto && (
+                        <div className={`alert alert-${mensaje.tipo} py-2 rounded-3 text-center mb-3`} role="alert">
+                            {mensaje.texto}
+                        </div>
+                    )}
+
+                    {/* BOTÓN AGREGAR AL CARRITO */}
                     <button 
-                        onClick={handleReservar}
-                        disabled={sinCupos}
-                        className={`btn btn-lg w-100 fw-bold rounded-pill shadow ${sinCupos ? 'btn-secondary' : ''}`}
-                        style={{ 
-                            backgroundColor: sinCupos ? '#6c757d' : '#198754', 
-                            borderColor: '#198754',
-                            color: '#FFFFFF',
-                            padding: '14px'
-                        }}
+                        onClick={handleAgregarAlCarrito}
+                        disabled={sinCupos || agregando}
+                        className="btn btn-dark btn-lg w-100 fw-bold rounded-pill shadow"
+                        style={{ padding: '14px' }}
                     >
-                        {sinCupos ? 'SIN LUGARES DISPONIBLES' : 'RESERVAR AHORA'}
+                        {agregando ? 'AGREGANDO...' : sinCupos ? 'SIN LUGARES DISPONIBLES' : 'AGREGAR AL CARRITO'}
                     </button>
                 </div>
             </div>

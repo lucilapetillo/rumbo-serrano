@@ -26,7 +26,7 @@ export const Actividad = sequelize.define('Actividad', {
     type: DataTypes.INTEGER,
     allowNull: false
   },
-  // --- RANGO DE FECHAS Y CUPOS ---
+ 
   fecha_inicio: {
     type: DataTypes.DATE,
     allowNull: true
